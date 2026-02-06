@@ -1,0 +1,114 @@
+# AOSP C/C++ element defaults
+# Provides command templates for building C/C++ code with AOSP Clang
+
+variables:
+  # Toolchain paths (inside sandbox)
+  aosp-clang-bin: /aosp/prebuilts/clang/host/linux-x86/clang-r522817/bin
+  aosp-sysroot: /aosp/prebuilts/build-tools/sysroots/x86_64-unknown-linux-musl
+
+  # Compiler commands — use clang-18 directly to bypass the Go wrapper
+  # (the Go wrapper fails in sandbox because it can't exec clang.real)
+  cc: "%{aosp-clang-bin}/clang-18"
+  cxx: "%{aosp-clang-bin}/clang-18 --driver-mode=g++"
+  ar: "%{aosp-clang-bin}/llvm-ar"
+  strip-tool: "%{aosp-clang-bin}/llvm-strip"
+
+  # Default flags
+  sysroot-flag: "--sysroot=%{aosp-sysroot}"
+  common-cflags: "-fPIC -fno-exceptions %{sysroot-flag}"
+  extra-cflags: ""
+  extra-ldflags: ""
+  include-flags: ""
+  src-files: ""
+
+  # Language: "c" or "c++" — controls which driver is used for linking
+  lang: "c"
+
+  # Build type: "static", "shared", or "binary"
+  build-type: "static"
+
+  # Output name
+  lib-name: "lib"
+  binary-name: "a.out"
+
+  # Install paths
+  install-libdir: "%{install-root}/usr/lib"
+  install-bindir: "%{install-root}/usr/bin"
+  install-includedir: "%{install-root}/usr/include"
+
+  # Object directory
+  objdir: "_objs"
+
+config:
+  configure-commands:
+  - |
+    mkdir -p %{objdir}
+
+  build-commands:
+  - |
+    # Compile all source files to objects
+    for src in %{src-files}; do
+      obj="%{objdir}/$(basename "${src}" | sed 's/\.[cCS]$/.o/;s/\.cc$/.o/;s/\.cpp$/.o/')"
+      case "${src}" in
+        *.c|*.S)
+          %{cc} %{common-cflags} %{extra-cflags} %{include-flags} -c "${src}" -o "${obj}"
+          ;;
+        *.cc|*.cpp)
+          %{cxx} %{common-cflags} %{extra-cflags} %{include-flags} -c "${src}" -o "${obj}"
+          ;;
+      esac
+    done
+
+  - |
+    # Select linker driver based on language
+    if [ "%{lang}" = "c++" ]; then
+      LINKER="%{cxx}"
+    else
+      LINKER="%{cc}"
+    fi
+
+    # Link step depends on build-type
+    case "%{build-type}" in
+      static)
+        %{ar} rcs "%{objdir}/%{lib-name}.a" %{objdir}/*.o
+        ;;
+      shared)
+        ${LINKER} -shared %{sysroot-flag} %{extra-ldflags} \
+          -o "%{objdir}/%{lib-name}.so" %{objdir}/*.o
+        ;;
+      binary)
+        ${LINKER} %{sysroot-flag} %{extra-ldflags} \
+          -o "%{objdir}/%{binary-name}" %{objdir}/*.o
+        ;;
+    esac
+
+  install-commands:
+  - |
+    case "%{build-type}" in
+      static)
+        install -Dm644 "%{objdir}/%{lib-name}.a" "%{install-libdir}/%{lib-name}.a"
+        ;;
+      shared)
+        install -Dm755 "%{objdir}/%{lib-name}.so" "%{install-libdir}/%{lib-name}.so"
+        ;;
+      binary)
+        install -Dm755 "%{objdir}/%{binary-name}" "%{install-bindir}/%{binary-name}"
+        ;;
+    esac
+
+  strip-commands:
+  - |
+    case "%{build-type}" in
+      static)
+        ;;
+      shared)
+        %{strip-tool} --strip-unneeded "%{install-libdir}/%{lib-name}.so" 2>/dev/null || true
+        ;;
+      binary)
+        %{strip-tool} --strip-unneeded "%{install-bindir}/%{binary-name}" 2>/dev/null || true
+        ;;
+    esac
+
+environment:
+  PATH: "/aosp/prebuilts/clang/host/linux-x86/clang-r522817/bin:/aosp/prebuilts/build-tools/linux-x86/bin:/usr/bin:/bin"
+  LD_LIBRARY_PATH: "/aosp/prebuilts/clang/host/linux-x86/clang-r522817/lib:/lib/x86_64-linux-gnu:/aosp/prebuilts/build-tools/sysroots/x86_64-unknown-linux-musl/lib"

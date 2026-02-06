@@ -1,0 +1,20 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# BuildStream
+.cache/
+
+# Large binary directories - recreate from AOSP tree or Alpine
+sources/sysroot/
+sources/host-glibc/
+sources/test-aosp-clang/
+
+# Editor
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
