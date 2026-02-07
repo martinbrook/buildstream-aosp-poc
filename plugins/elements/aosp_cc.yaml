@@ -16,6 +16,8 @@ variables:
   # Default flags
   sysroot-flag: "--sysroot=%{aosp-sysroot}"
   common-cflags: "-fPIC -fno-exceptions %{sysroot-flag}"
+  # musl sysroot has no libgcc/libgcc_eh — use compiler-rt instead
+  common-ldflags: "--rtlib=compiler-rt -unwindlib=none"
   extra-cflags: ""
   extra-ldflags: ""
   include-flags: ""
@@ -73,11 +75,11 @@ config:
         %{ar} rcs "%{objdir}/%{lib-name}.a" %{objdir}/*.o
         ;;
       shared)
-        ${LINKER} -shared %{sysroot-flag} %{extra-ldflags} \
+        ${LINKER} -shared %{sysroot-flag} %{common-ldflags} %{extra-ldflags} \
           -o "%{objdir}/%{lib-name}.so" %{objdir}/*.o
         ;;
       binary)
-        ${LINKER} %{sysroot-flag} %{extra-ldflags} \
+        ${LINKER} %{sysroot-flag} %{common-ldflags} %{extra-ldflags} \
           -o "%{objdir}/%{binary-name}" %{objdir}/*.o
         ;;
     esac

@@ -13,4 +13,4 @@ variables:
   binary-name: bzip2
   src-files: bzip2.c
   extra-cflags: -Werror -Wno-unused-parameter
-  extra-ldflags: "-L/usr/lib -lbz -static --rtlib=compiler-rt -unwindlib=none"
+  extra-ldflags: "-L/usr/lib -lbz -static"
